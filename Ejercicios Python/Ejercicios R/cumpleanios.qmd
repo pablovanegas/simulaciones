@@ -1,0 +1,94 @@
+# Punto cumpleaños
+
+
+”Uno de los problemas mas contraintuitivos en probabilidad tiene que ver con la de
+coincidencia de cumpleanos. Cual es la probabilidad de que dos personas en un total
+de 23 celebren su cumpleanos el mismo dıa?´´ (Singh, 1997)*. Para este problema
+ud. realiza una simulacion donde n, el numero de personas va desde 2 hasta 50.
+Calcule, para cada caso la probabilidad de que
+# 1.
+exactamente solo dos personas cumplan anos el mismo dıa
+```{r}
+# Number of simulations
+num_simulations <- 10000
+
+# Number of people
+n_people <- 2:50
+
+# Function to calculate the probability
+calculate_probability <- function(n) {
+  count <- 0
+  for (i in 1:num_simulations) {
+    birthdays <- sample(1:365, n, replace = TRUE)
+    if (length(birthdays) != length(unique(birthdays))) {
+      if (length(birthdays) - length(unique(birthdays)) == 1) {
+        count <- count + 1
+      }
+    }
+  }
+  return(count / num_simulations)
+}
+
+# Calculate probabilities for each number of people
+probabilities <- sapply(n_people, calculate_probability)
+
+# Plot the results
+plot(n_people, probabilities, type = "o", xlab = "Number of People", ylab = "Probability", main = "Probability of Exactly Two People Sharing a Birthday")
+
+```
+Podemos ver que la probabilidad de que dos personas compartan su fecha de cumpleaños aumenta con respecto a mas personas hay casi hasta 25, de 30 en adelante esta probabilidad va disminuyendo respecto la cantidad de personas aumenta
+
+#2.
+dos o mas personas cumplan anos el mismo dıa.
+Realice la similuacion y presente todos los resultados pertinentes con graficos y tablas. Saque las conclusiones que considere adecuadas
+
+```{r}
+# Calcular las probabilidades para cada número de personas
+probabilities <- sapply(n_people, calculate_probability)
+
+# Crear un data frame con los resultados
+results <- data.frame(
+  "Número de personas" = n_people,
+  "Probabilidad" = probabilities
+)
+
+# Imprimir la tabla
+print(results)
+```
+
+
+
+
+# Punto estimador de funcion dada
+
+
+Supongamos que tenemos una muestra aleatoria $X_1, X_2, \ldots, X_n$ de una distribución de Poisson con parámetro $\lambda$. La función de verosimilitud para esta muestra está dada por:
+
+$$L(\lambda; x_1, x_2, \ldots, x_n) = \prod_{i=1}^n P_X(X_i = x_i) = \prod_{i=1}^n \frac{\lambda^{x_i} e^{-\lambda}}{x_i!}$$
+
+Para encontrar el estimador de máxima verosimilitud de $\lambda$, debemos maximizar la función de verosimilitud (o su logaritmo natural, que es más fácil de manipular) con respecto a $\lambda$.
+
+$$\ell(\lambda; x_1, x_2, \ldots, x_n) = \ln L(\lambda; x_1, x_2, \ldots, x_n) = \sum_{i=1}^n \left(x_i \ln \lambda - \lambda - \ln x_i!\right)$$
+
+Derivando $\ell(\lambda)$ con respecto a $\lambda$ e igualando a cero, obtenemos:
+
+$$\frac{\partial \ell(\lambda)}{\partial \lambda} = \sum_{i=1}^n \left(\frac{x_i}{\lambda} - 1\right) = 0$$
+
+$$\sum_{i=1}^n x_i = n\lambda$$
+
+$$\lambda = \frac{1}{n} \sum_{i=1}^n x_i = \bar{X}$$
+
+Por lo tanto, el estimador de máxima verosimilitud para $\lambda$ es la media muestral $\bar{X}$.
+
+Algunas propiedades importantes del estimador de máxima verosimilitud $\bar{X}$ son:
+
+1. \textbf{Insesgado}: El valor esperado de $\bar{X}$ es $E(\bar{X}) = \lambda$, por lo que $\bar{X}$ es un estimador insesgado de $\lambda$.
+
+2. \textbf{Eficiente}: $\bar{X}$ es un estimador eficiente, lo que significa que tiene la menor varianza posible entre todos los estimadores insesgados de $\lambda$.
+
+3. \textbf{Consistente}: A medida que el tamaño de la muestra $n$ aumenta, $\bar{X}$ converge en probabilidad a $\lambda$.
+
+4. \textbf{Suficiente}: $\bar{X}$ es un estadístico suficiente para $\lambda$, lo que significa que contiene toda la información relevante sobre $\lambda$ presente en la muestra.
+
+En resumen, el estimador de máxima verosimilitud para el parámetro $\lambda$ de una distribución de Poisson es la media muestral $\bar{X}$, que es un estimador insesgado, eficiente, consistente y suficiente.
+
