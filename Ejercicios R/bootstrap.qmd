@@ -1,0 +1,174 @@
+# Generando muestras
+```{r}
+# Definir los parámetros de la distribución
+mu <- 0    # media
+sigma <- 1 # desviación estándar
+
+# Definir los tamaños de muestra
+tamanos_de_muestra <- c(5, 10, 20, 50, 100, 200, 500,1000)
+
+# Crear una lista para almacenar las muestras
+muestras <- list()
+set.seed(420)
+for (n in tamanos_de_muestra) {
+  # Generar una muestra de la distribución normal
+  muestra_normal <- rnorm(n, mean = mu, sd = sigma)
+  
+  # Transformar la muestra normal a una muestra exponencial
+  muestra_exponencial <- exp(muestra_normal)
+  
+  # Almacenar la muestra en la lista
+  muestras[[paste0("N_", n)]] <- muestra_exponencial
+} # fin del for
+
+
+```
+
+
+```{r}
+head(muestras)
+```
+
+
+```{r}
+# Crear una lista para almacenar los intervalos de confianza
+intervalos_de_confianza <- list()
+
+# Calcular los intervalos de confianza para cada muestra
+for (i in 1:length(muestras)) {
+  # Extraer la muestra
+  muestra <- muestras[[i]] # extraer la muestra de la lista con todas las muestras
+  
+  # Realizar una prueba t de una muestra
+  prueba_t <- t.test(muestra)
+  
+  # Extraer el intervalo de confianza de los resultados de la prueba t
+  intervalo_de_confianza <- prueba_t$conf.int
+  
+  # Almacenar el intervalo de confianza en la lista
+  intervalos_de_confianza[[names(muestras)[i]]] <- intervalo_de_confianza
+}
+
+```
+
+
+```{r}
+head(intervalos_de_confianza)
+
+```
+
+
+# Bootstrap
+
+
+```{r}
+
+library(boot)
+#help(boot)
+# Crear una lista para almacenar los intervalos de confianza usando bootstrap
+intervalos_de_confianza_bootstrap <- list()
+
+# Definir una función para calcular la media
+media <- function(data, indices) {
+  return(mean(data[indices]))
+}
+
+# Calcular los intervalos de confianza bootstrap para cada muestra
+for (i in 1:length(muestras)) {
+  # Extraer la muestra
+  muestra <- muestras[[i]]
+  
+  # Aqui se realiza el boostrap con la media respectiva de cada muestra un total de R= 1000  (repeticiones)
+  resultados_bootstrap <- boot(data = muestra, statistic = media, R = 1000)
+  
+  # Calcular el intervalo de confianza bootstrap con boot.cu
+#help(boot.ci)
+  intervalo_de_confianza_bootstrap <- boot.ci(resultados_bootstrap, type = "bca")
+  
+  # Almacenar el intervalo de confianza bootstrap en la lista
+  intervalos_de_confianza_bootstrap[[names(muestras)[i]]] <- intervalo_de_confianza_bootstrap
+}
+
+
+
+
+```
+
+
+```{r}
+head(intervalos_de_confianza_bootstrap)
+```
+
+
+
+```{r}
+# Crear una lista para almacenar las veces que el intervalo de confianza bootstrap contiene la media de la muestra
+contiene_media_muestra <- list()
+
+# Calcular la longitud de los intervalos de confianza y verificar si contienen la media de la muestra
+for (i in 1:length(intervalos_de_confianza_bootstrap)) {
+  # Extraer el intervalo de confianza
+  intervalo_de_confianza <- intervalos_de_confianza_bootstrap[[i]]$bca[4:5]
+  # En [4:5] es donde se guarda el limite inferior y superior
+  # Calcular la media de la muestra
+  media_muestra <- mean(muestras[[i]])
+  
+  # Verificar si el intervalo de confianza contiene la media de la muestra
+  contiene <- media_muestra >= intervalo_de_confianza[1] & media_muestra <= intervalo_de_confianza[2]
+  
+  # Almacenar si contiene la media de la muestra en la lista
+  contiene_media_muestra[[names(intervalos_de_confianza_bootstrap)[i]]] <- contiene
+}
+
+```
+
+```{r}
+head(contiene_media_muestra)
+```
+
+
+# Comparaciones
+
+```{r}
+# Crear una lista para almacenar las longitudes de los intervalos de confianza
+longitudes <- list()
+
+# Calcular la longitud de los intervalos de confianza para cada muestra
+for (i in 1:length(intervalos_de_confianza_bootstrap)) {
+  # Extraer el intervalo de confianza
+  intervalo_de_confianza <- intervalos_de_confianza_bootstrap[[i]]$bca[4:5]
+  
+  # Calcular la longitud del intervalo de confianza
+  longitud <- diff(intervalo_de_confianza)
+  
+  # Almacenar la longitud en la lista
+  longitudes[[names(intervalos_de_confianza_bootstrap)[i]]] <- longitud
+}
+
+
+```
+
+
+```{r}
+# Cargar la librería necesaria
+library(ggplot2)
+
+# Convertir las listas a data frames para su uso con ggplot2
+df_longitudes <- data.frame(Tamaño = as.numeric(gsub("N_", "", names(longitudes))), Longitud = unlist(longitudes))
+df_contiene_media <- data.frame(Tamaño = as.numeric(gsub("N_", "", names(contiene_media_muestra))), ContieneMedia = unlist(contiene_media_muestra))
+
+# Crear un gráfico de la longitud de los intervalos de confianza en función del tamaño de la muestra
+ggplot(df_longitudes, aes(x = Tamaño, y = Longitud)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  labs(x = "Tamaño de la muestra", y = "Longitud del intervalo de confianza", title = "Longitud del intervalo de confianza en función del tamaño de la muestra")
+
+# Crear un gráfico de la proporción de veces que los intervalos de confianza contienen la media de la muestra en función del tamaño de la muestra
+ggplot(df_contiene_media, aes(x = Tamaño, y = ContieneMedia)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  labs(x = "Tamaño de la muestra", y = "Proporción de veces que el intervalo de confianza contiene la media de la muestra", title = "Proporción de veces que el intervalo de confianza contiene la media de la muestra en función del tamaño de la muestra")
+
+
+```
+
