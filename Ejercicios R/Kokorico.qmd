@@ -1,0 +1,178 @@
+---
+title: "TareaKokorico"
+author: "Juan Pablo Vanegas Moreno"
+date: "`r Sys.Date()`"
+description: "Este documento contiene simulacion basica del negocio de Kokorico."
+output:
+  html_document:
+    toc_depth: 2
+    number_sections: true
+    editor: visual
+    titlepage: true
+format:
+  html:
+    code-overflow: wrap
+    code-fold: true
+    code-tools: true
+    highlight-style: github #[Input]
+    theme: cerulean #[Input]
+    toc: true #[Input]
+---
+
+En la cafetería, llegan 50 clientes por hora, de los cuales 20 solicitan productos de la máquina. Sin embargo, es importante considerar que esta tasa de clientes que compran productos de la máquina no es constante a lo largo del día. Asumiremos que la cantidad de clientes que visitan la tienda y compran productos de la máquina se mantiene constante durante todo el día. No obstante, ni la cantidad de clientes por hora ni la cantidad de clientes que adquieren productos de la máquina permanecen constantes. De hecho, la tasa de clientes aumenta en las horas de la mañana, disminuye en las horas pares y vuelve a aumentar en las horas impares. Además, disminuye en las horas de la tarde y vuelve a aumentar en las horas de la noche, y estos patrones cambian a lo largo del semestre.
+
+# Simulacion para un solo dia
+
+```{r}
+#| code-fold: true
+#| output: html_document 
+#| eval: true
+#| code-summary: "[Input]"
+clienteshora <- 50 #Clientes que llegan por hora
+clientesmaquina <- 20 #Clientes que compran productos de la maquina por hora
+tasa <- clientesmaquina/clienteshora #Tasa de clientes que compran productos de la maquina
+clientesdia <- clienteshora*10 #Clientes que llegan al dia
+clientesfinal <- tasa*clientesdia #Clientes que compran productos de la maquina al dia
+#Datos
+productos <- c( "Cafe con leche","Cafe Kaldi", "Capuccino","Choco express", "Espresso corto", "Espresso largo","Latte", "Perico", "Tinto")
+precios <- c(2500,3500,4500,4000,4400,4000,3500,2200,2000)
+tasas <- c(0.35,0.01,0.05,0.06,0.03,0.02,0.03,0.1,0.35)
+
+set.seed(420)
+
+# Simula la cantidad de pedidos por día para cada producto usando una distribución multinomial
+pedidos <- rmultinom(1, clientesfinal, tasas)
+
+# Vector para la cantidad de pedidos por producto
+cantidades <- pedidos
+
+# Vector para el precio por producto
+precios <- as.numeric(precios)
+
+# facturación por producto
+facturacion_producto <- cantidades * precios
+
+# Facturación 
+facturacion_total <- sum(facturacion_producto)
+
+# total de bebidas
+produccion_total <- sum(pedidos)
+
+resumen_produccion <- data.frame(
+  Producto = productos,
+  Cantidad = pedidos
+)
+
+
+print(resumen_produccion)
+```
+
+```{r}
+print(paste("Facturación total:", facturacion_total))
+
+print(paste("Producción total de bebidas:", produccion_total))
+
+```
+
+```{r}
+library(ggplot2)
+
+df <- data.frame(
+  Producto = resumen_produccion$Producto,
+  Cantidad = resumen_produccion$Cantidad
+)
+
+df <- df[order(-df$Cantidad),]
+
+ggplot(df, aes(x=reorder(Producto, Cantidad), y=Cantidad, fill=Producto)) +
+  geom_bar(stat="identity") +
+  labs(title="Producción por Producto", x="Producto", y="Cantidad") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette="Spectral")
+
+```
+
+# Simulacion N dias
+
+```{r}
+Nsim <- 1000 #Numero de simulaciones dias
+horas <- 10 #Horas de trabajo
+clienteshora <- 50 #Clientes que llegan por hora
+clientesmaquina <- 20 #Clientes que compran productos de la maquina por hora
+tasa <- clientesmaquina/clienteshora #Tasa de clientes que compran productos de la maquina
+clientesdia <- clienteshora*horas #Clientes que llegan al dia
+clientesfinal <- tasa*clientesdia #Clientes que compran productos de la maquina al dia
+#Datos
+productos <- c( "Cafe con leche","Cafe Kaldi", "Capuccino","Choco express", "Espresso corto", "Espresso largo","Latte", "Perico", "Tinto")
+precios <- c(2500,3500,4500,4000,4400,4000,3500,2200,2000)
+tasas <- c(0.35,0.01,0.05,0.06,0.03,0.02,0.03,0.1,0.35)
+
+set.seed(420)
+
+# Matriz para los resultados
+resultados <- matrix(0, nrow=Nsim, ncol=length(productos))
+
+
+for (i in 1:Nsim) { # Ciclo de simulación dias
+  for (h in 1:horas) { # Ciclo de horas 
+    # Número de clientes en una hora
+    n <- rpois(1, clienteshora)
+    
+    # Número de clientes que compran productos de la máquina
+    m <- rbinom(1, n, tasa)
+    
+    # Elección de productos
+    eleccion <- rmultinom(1, m, tasas)
+    
+    # Actualización de los resultados
+    resultados[i,] <- resultados[i,] + eleccion
+  } # Fin del ciclo de horas
+} # Fin del ciclo de simulación
+
+# Cálculo del producido diario
+producido <- resultados %*% precios
+
+
+```
+
+```{r}
+producido_promedio <- mean(producido)
+
+print("Producido promedio por día:")
+print(producido_promedio)
+
+```
+
+```{r}
+df <- data.frame(Ventas=as.vector(rowSums(resultados)))
+
+ggplot(df, aes(x=Ventas)) +
+  geom_density(fill="steelblue", alpha=0.5) +
+  labs(title="Densidad de Productos Vendidos", x="Ventas", y="Densidad") +
+  theme_minimal()
+
+```
+
+```{r}
+df <- data.frame(Facturacion=as.vector(producido))
+
+ggplot(df, aes(x=Facturacion)) +
+  geom_density(fill="steelblue", alpha=0.5) +
+  labs(title="Densidad de Facturación Total", x="Facturación", y="Densidad") +
+  theme_minimal()
+
+```
+
+```{r}
+hist(producido, main="Histogram Facturación", xlab="Facturación", col="lightblue", border="black")
+```
+
+```{r}
+num_bebidas <- rowSums(resultados)
+
+media <- mean(num_bebidas)
+desviacion <- sd(num_bebidas)
+
+hist(num_bebidas, main="Histograma del número de bebidas producidas", xlab="Número de bebidas", col="lightblue", border="black")
+```
