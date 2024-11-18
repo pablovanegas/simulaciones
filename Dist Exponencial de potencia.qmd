@@ -1,0 +1,192 @@
+---
+title: "Distribución exponencial de potencia"
+format: html
+editor: visual
+---
+
+```{r}
+library(ggplot2)
+
+```
+
+
+
+# Graph
+
+```{r}
+# Definir los valores de alpha
+alphas <- seq(1, 5, length.out = 5) 
+x <- seq(-5, 5, length = 100)
+
+pdf_exponential_power <- function(x, alpha) {
+  exp(-abs(x)^alpha / (2 * gamma(1 + 1/alpha)))
+}
+# Crear un dataframe para cada valor de alpha
+df <- data.frame(
+  x = rep(x, times = length(alphas)),
+  y = unlist(lapply(alphas, function(alpha) pdf_exponential_power(x, alpha = alpha))),
+  alpha = rep(alphas, each = length(x))
+)
+
+# Graficar la función de densidad de probabilidad
+ggplot(df, aes(x = x, y = y, color = as.factor(alpha))) +
+  geom_line() +
+  labs(x = "x", y = "f(x)", color = "Alpha") +
+  theme_minimal() +
+  ggtitle("Función de densidad de probabilidad de la distribución exponencial de potencia")
+
+```
+
+## Usin a R library
+
+normalp is a package for the statistical environment R that has a set of tools for dealing with the exponential power distribution. In this package there are functions to compute the density function, the distribution function and the quantiles from an exponential power distribution and to generate pseudo–random numbers from the same distribution. Moreover, methods concerning the estimation of the distribution parameters are described and implemented. It is also possible to estimate linear regression models when we assume the random errors distributed according to an exponential power distribution
+
+```{r}
+library(normalp)
+
+graphnp(p = c(1, 2, 3, 4, 5), mu = 1, sigmap = 1,
+title="Exponential power distributions")
+```
+
+
+
+# Mean and Variance
+
+## P.D.F
+
+A random variable X is said to have an normal distribution with parameters $\mu$ and $\sigma^2$ if its probability density function is given by:
+
+$$
+f(x) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\frac{(x-\mu)^2}{2\sigma^2}}
+$$ we can generalize the normal distribution to the exponential power distribution by replacing the exponent of the exponential function with a power function. The probability density function of the exponential power distribution is given by:
+
+$$
+f(x) = \frac{\beta}{2\alpha\Gamma(1/\beta)} e^{-(|x-\mu|/\alpha)^\beta} 
+$$ let's call this equation equation (2) that can also be written as:
+
+$$
+f(x)=\exp \left(\frac{-|x|^\alpha}{2 \Gamma(1+1 / \alpha)}\right)
+$$ after replacing the $\beta$ por $1/\alpha$ and $|x-\mu|$ for $|x|$ (assuming $\mu = 0$ to simplify).
+
+## Moments
+
+If $X$ has the p.d.f. (equation (2)) then the standardized variable $Z=(X-\mu) / \sigma$ will have the p.d.f. $$
+f(z)=\frac{\beta \exp \left\{-|z|^s\right\}}{2 \Gamma(1 / \beta)}
+$$
+
+then the kth moment of $Z$ is given by:
+
+$$
+E(Z^k) = \frac{1+(-1)^k}{2 \Gamma (\frac{1}{\beta})} \Gamma \left(\frac{k+1}{\beta}\right)
+$$ thus, the nth moment of X is given by:
+
+$$
+E(X^n) = E[(\mu + \alpha*Z)^n] = \mu^n + \sum_{k=1}^{n} \binom{n}{k} \mu^{n-k} \alpha^k E(X^k) \\\
+= \mu^n + \sum_{k=1}^{n} \binom{n}{k} \mu^{n-k} \alpha^k \frac{1+(-1)^k}{2 \Gamma (\frac{1}{\beta})} \Gamma \left(\frac{k+1}{\beta}\right)
+$$ with this the first 4 moments of X are given by:
+
+$$
+E(X) = \mu \\\
+E(X^2) = \mu^2 + \alpha^2 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{3}{\beta}\right) \\\
+E(X^3) = \mu^3 + 3 \mu \alpha^2 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{3}{\beta}\right) \\\
+E(X^4) = \mu^4 + 6 \mu^2 \alpha^2 + 3 \alpha^4 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{5}{\beta}\right)
+$$ Now the nth central moment of X is given by: $$
+E[(X-\mu)^n] = \frac{1+(-1)^n}{2 \Gamma (\frac{1}{\beta})} \Gamma \left(\frac{n+1}{\beta}\right)
+$$ with this the three first central moments of X are given by:
+
+$$
+Var(X) = E[(X-\mu)^2] = \alpha^2 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{3}{\beta}\right) \\\
+E[{(X-\mu)^3}] = 0 \\\
+E[{(X-\mu)^4}] =  \alpha^4 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{5}{\beta}\right)
+$$ \## Conclusion To summarize, the mean and the variance of the exponential power distribution are given by:
+
+$$
+E[X] = \mu \\\
+Var(X) = \alpha^2 \frac{1}{\Gamma (\frac{1}{\beta})} \Gamma \left(\frac{3}{\beta}\right)
+$$ but for $\alpha < 1$, the mean and variance are not defined in terms of elementary functions.
+
+
+
+# Algorithms
+
+## Algorithm 1: Metropolis–Hastings algorithm
+
+```{r}
+pdf_exponential_power <- function(x, alpha) {
+  exp(-abs(x)^alpha / (2 * gamma(1 + 1/alpha)))
+}
+
+metropolis_hastings <- function(alpha, n, burn_in = 1000) {
+  samples <- numeric(n + burn_in)
+  samples[1] <- 0  # valor inicial beta0
+  for (i in 2:(n + burn_in)) { #creacion de la cadena de markov
+    current <- samples[i - 1] #sacamos un candidato
+    candidate <- rnorm(1, mean = current, sd = 1)  # Proposal distribution: N(current, 1) funcion en el candidato
+    A <- pdf_exponential_power(candidate, alpha) / pdf_exponential_power(current, alpha) #apriori
+    if (runif(1) < A) {
+      samples[i] <- candidate
+    } else {
+      samples[i] <- current
+    }
+  } #fin del for
+  # Si A es mayor que un número aleatorio entre 0 y 1, se acepta el candidato como la siguiente muestra
+  return(samples[(burn_in + 1):(n + burn_in)])  # Discard burn-in period
+}
+
+#generando muestras
+alpha <- 1.5
+n_samples <- 10000
+samples <- metropolis_hastings(alpha, n_samples)
+
+hist(samples, breaks = 50, probability = TRUE, main = paste("Histogram of Samples with alpha =", alpha))
+
+
+```
+
+## Algorithm 2  CDF inversa
+
+
+
+```{r}
+# Define the PDF
+pdf_exponential_power <- function(x, alpha) {
+  exp(-abs(x)^alpha / (2 * gamma(1 + 1/alpha)))
+}
+
+# Define the CDF using numerical integration
+cdf_exponential_power <- function(x, alpha) {
+  integrate(function(t) pdf_exponential_power(t, alpha), -Inf, x)$value
+}
+
+# Define the inverse CDF using root finding
+inv_cdf_exponential_power <- function(u, alpha) {
+  uniroot(function(x) cdf_exponential_power(x, alpha) - u, c(-10, 10))$root
+}
+
+# Generate samples
+generate_samples <- function(n, alpha) {
+  u <- runif(n)
+  sapply(u, function(u) inv_cdf_exponential_power(u, alpha))
+}
+
+# Generate some samples
+samples <- generate_samples(1000, 1.5)
+
+# Plot histogram of samples
+hist(samples, probability = TRUE, breaks = 30, main = "Samples from Exponential Power Distribution", xlab = "x")
+
+# Overlay the PDF
+x <- seq(-3, 3, length.out = 100)
+lines(x, pdf_exponential_power(x, 1.5), col = "red")
+
+
+```
+
+# Referencias
+
+Saralees Nadarajah (2005) A generalized normal distribution, Journal of
+Applied Statistics, 32:7, 685-694, DOI: 10.1080/02664760500079464
+
+ Kalos, Malvin H.; Whitlock, Paula A. (1986). Monte Carlo Methods Volume I: Basics. New York: Wiley. pp. 78–88.
+ 
+https://www.youtube.com/watch?v=dFOiiIX79Cg
