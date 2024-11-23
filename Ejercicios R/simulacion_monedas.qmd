@@ -1,0 +1,524 @@
+---
+title: "simulacion_monedas"
+editor: visual
+format:
+   html:
+     toc: true
+
+---
+
+```{r}
+library(tinytex)
+```
+
+
+```{r}
+library(dplyr)
+# Crear el data frame con tus datos
+monedas <- data.frame(
+  DENOMINACION = c("50a", "50a", "50a", "50a", "50a", 
+                   "100a", "100a", "100a", "100a", "100a", 
+                   "200a", "200a", "200a", "200a", "200a",
+                   "500", "500", "500", "500", "500", 
+                   "1000", "1000", "1000", "1000", "1000", 
+                   "50", "50", "50", "50", "50", 
+                   "100", "100", "100", "100", "100", 
+                   "200", "200", "200", "200", "200"),
+  PESO_MONEDA = c(4, 4, 5, 4, 4, 
+                  5, 5, 5, 5, 5, 
+                  6, 6, 6, 6, 6, 
+                  7, 7, 7, 7, 7, 
+                  11, 12, 11, 12, 11, 
+                  2, 2, 2, 2, 2, 
+                  4, 3, 3, 3, 3, 
+                  5, 4, 4, 4, 5)
+)
+
+# Filtrar las monedas que no contienen "a" en la denominación
+monedas_relevantes <- monedas %>%
+  filter(!grepl("a", DENOMINACION))
+
+# Ver las monedas relevantes
+print(monedas_relevantes)
+
+```
+
+```{r}
+# medidas estadisticas de cada grupo de monedas
+
+medidas <- monedas %>%
+  group_by(DENOMINACION) %>%
+  summarise(
+    media = mean(PESO_MONEDA),
+    mediana = median(PESO_MONEDA),
+    desviacion = sd(PESO_MONEDA),
+    minimo = min(PESO_MONEDA),
+    maximo = max(PESO_MONEDA)
+  )
+
+
+
+```
+
+# Simulacion de monedas
+
+```{r}
+# Instalar y cargar dplyr si no lo tienes instalado
+# install.packages("dplyr")
+library(dplyr)
+
+# Crear el data frame con las medidas obtenidas
+medidas <- monedas %>%
+  group_by(DENOMINACION) %>%
+  summarise(
+    media = mean(PESO_MONEDA),
+    desviacion = sd(PESO_MONEDA)
+  )
+
+  
+```
+
+# Simulaciones de pesos de monedas
+
+```{r}
+# Definir el número de simulaciones por denominación
+n_simulaciones <- 100 
+
+# Crear una lista vacía para almacenar los resultados de las simulaciones
+simulaciones_lista <- list()
+
+# Realizar simulaciones normales para cada denominación
+set.seed(110100100)  # Para reproducibilidad
+for(i in 1:nrow(medidas)) {
+  simulaciones_lista[[i]] <- data.frame(
+    DENOMINACION = medidas$DENOMINACION[i],
+    PESO_SIMULADO = rnorm(n = n_simulaciones, 
+                          mean = medidas$media[i], 
+                          sd = medidas$desviacion[i])
+  )
+}
+
+# Convertir la lista en un solo data frame
+simulaciones_normales <- do.call(rbind, simulaciones_lista)
+
+# Mostrar algunas de las simulaciones
+head(simulaciones_normales)
+```
+
+```{r}
+
+# separando las simulaciones por denominación
+simulaciones_normales <- simulaciones_normales %>%
+  group_by(DENOMINACION) %>%
+  mutate(simulacion = row_number())
+
+```
+
+# visualizacion de las simulaciones
+
+```{r}
+library(ggplot2)
+# Visualización de las simulaciones usando ggplot2
+ggplot(simulaciones_normales, aes(x = PESO_SIMULADO, color = DENOMINACION)) +
+  geom_density(size = 1.2) +   # Gráfico de densidad
+  labs(
+    title = "Distribución de los Pesos Simulados por Denominación",
+    x = "Peso Simulado",
+    y = "Densidad"
+  ) +
+  theme_minimal() +            # Tema más limpio
+  theme(legend.title = element_blank())  # Eliminar título de la leyenda
+```
+
+```{r}
+# Cargar dplyr si no está cargado
+library(dplyr)
+
+
+# Crear un campo de valor por unidad de peso (supongamos que el valor es numérico y coincide con la denominación)
+monedas_relevantes <- monedas_relevantes %>%
+  mutate(valor_peso = as.numeric(DENOMINACION) / PESO_MONEDA) %>%
+  arrange(desc(valor_peso))  # Ordenar por mayor valor/peso
+
+# Paso 2: Definir el peso máximo (en gramos)
+peso_maximo <- 1000
+
+# Inicializar variables
+peso_total <- 0
+valor_total <- 0
+seleccion_monedas <- data.frame(DENOMINACION = character(), PESO_MONEDA = numeric(), CANTIDAD = numeric())
+
+
+```
+
+## Algoritmo Greedy para Selección de Monedas
+
+El algoritmo **greedy** (o codicioso) es un enfoque de optimización que busca hacer la mejor elección local en cada paso, con la esperanza de que estas elecciones locales óptimas resulten en una solución globalmente óptima. En este caso, el objetivo es maximizar el valor total de las monedas seleccionadas mientras se respeta la restricción de peso máximo permitido.
+
+### Descripción del Algoritmo
+
+El algoritmo greedy para la selección de monedas se basa en los siguientes pasos:
+
+1. Inicializa las variables `peso_total` y `valor_total` en cero. Estas variables se usan para acumular el peso total y el valor total de las monedas seleccionadas, respectivamente.
+
+2. Recorre las monedas relevantes, ordenadas por el valor por unidad de peso en orden descendente. Esto asegura que se consideren primero las monedas con el mayor valor relativo por unidad de peso.
+
+3. Para cada tipo de moneda, calcula el número máximo de monedas que se pueden incluir sin exceder el peso máximo permitido. Este cálculo se realiza con la fórmula:
+
+   $$
+   \text{max\_monedas} = \left\lfloor \frac{\text{peso\_maximo} - \text{peso\_total}}{\text{PESO\_MONEDA}[i]} \right\rfloor
+   $$
+
+   donde `PESO_MONEDA[i]` es el peso de la moneda actual y `peso_maximo` es el límite superior del peso total permitido.
+
+4. Si el número máximo de monedas calculado es mayor que cero, actualiza el `peso_total` y el `valor_total` sumando el peso y el valor de las monedas seleccionadas:
+
+   $$
+   \text{peso\_total} \leftarrow \text{peso\_total} + (\text{max\_monedas} \times \text{PESO\_MONEDA}[i])
+   $$
+   $$
+   \text{valor\_total} \leftarrow \text{valor\_total} + (\text{max\_monedas} \times \text{VALOR\_MONEDA}[i])
+   $$
+
+5. Almacena la cantidad de monedas seleccionadas en una estructura de datos adecuada.
+
+6. Repite el proceso hasta que el `peso_total` alcance el peso máximo permitido o se hayan considerado todas las monedas relevantes.
+
+### Evaluación de Resultados
+
+El resultado del algoritmo incluye el valor total de las monedas seleccionadas, el peso total y una tabla que muestra la combinación específica de monedas seleccionadas. Esta combinación es la que maximiza el valor total de las monedas sin exceder el peso máximo permitido.
+
+## Simulación de Pesos de las Monedas
+
+Dado que los pesos de las monedas no son fijos y pueden variar, se realizó una simulación para evaluar la variabilidad en el peso de las monedas. Se asumió que el peso de cada moneda sigue una distribución normal con media y desviación estándar estimadas a partir de los datos disponibles. 
+
+Para cada denominación de moneda, se generaron simulaciones del peso utilizando el siguiente proceso:
+
+- Se calcularon la media y la desviación estándar del peso para cada denominación.
+- Se realizaron 100 simulaciones para cada denominación, generando pesos simulados basados en una distribución normal.
+- Se compiló un data frame con los pesos simulados para todas las denominaciones.
+
+## Procesamiento de Datos Simulados
+
+Después de realizar las simulaciones, se creó un data frame con la información de las monedas simuladas. Este data frame incluye:
+
+- El peso medio simulado para cada denominación.
+- El valor total, que se asumió igual a la denominación de la moneda.
+
+Los datos simulados se ordenaron por el valor por unidad de peso, lo cual permite evaluar y comparar la eficiencia de cada moneda en términos de valor obtenido por unidad de peso.
+
+$$
+\text{Valor por Unidad de Peso} = \frac{\text{VALOR\_TOTAL}}{\text{PESO\_MEDIO}}
+$$
+
+```{r}
+# Algoritmo greedy para seleccionar monedas
+for (i in 1:nrow(monedas_relevantes)) {
+  if (peso_total >= peso_maximo) break
+  
+  # Número máximo de monedas que caben del tipo actual
+  max_monedas <- floor((peso_maximo - peso_total) / monedas_relevantes$PESO_MONEDA[i])
+  
+  if (max_monedas > 0) {
+    # Actualizar peso y valor total
+    peso_total <- peso_total + max_monedas * monedas_relevantes$PESO_MONEDA[i]
+    valor_total <- valor_total + max_monedas * as.numeric(monedas_relevantes$DENOMINACION[i])
+    
+    # Almacenar la selección de monedas
+    seleccion_monedas <- rbind(seleccion_monedas, data.frame(
+      DENOMINACION = monedas_relevantes$DENOMINACION[i],
+      PESO_MONEDA = monedas_relevantes$PESO_MONEDA[i],
+      CANTIDAD = max_monedas
+    ))
+  }
+}
+```
+
+# Resultados de la combinacion de monedas usando el metodo greedy
+
+```{r}
+# Mostrar los resultados
+print(paste("Valor total de monedas:", valor_total))
+print(paste("Peso total de monedas:", peso_total))
+print("Combinación de monedas seleccionadas:")
+print(seleccion_monedas)
+```
+
+```{r}
+# Cargar librerías necesarias
+library(dplyr)
+
+# Crear el data frame con las medidas obtenidas
+medidas <- monedas_relevantes %>%
+  group_by(DENOMINACION) %>%
+  summarise(
+    media = mean(PESO_MONEDA),
+    desviacion = sd(PESO_MONEDA)
+  )
+
+# Definir el número de simulaciones por denominación
+n_simulaciones <- 100 
+
+# Crear una lista vacía para almacenar los resultados de las simulaciones
+simulaciones_lista <- list()
+
+# Realizar simulaciones normales para cada denominación
+set.seed(110100100)  # Para reproducibilidad
+for(i in 1:nrow(medidas)) {
+  simulaciones_lista[[i]] <- data.frame(
+    DENOMINACION = medidas$DENOMINACION[i],
+    PESO_SIMULADO = rnorm(n = n_simulaciones, 
+                          mean = medidas$media[i], 
+                          sd = medidas$desviacion[i])
+  )
+}
+
+# Convertir la lista en un solo data frame
+simulaciones_normales <- do.call(rbind, simulaciones_lista)
+
+# Mostrar algunas de las simulaciones
+head(simulaciones_normales)
+
+```
+
+```{r}
+# Crear un data frame con la información de las monedas relevantes y sus simulaciones
+monedas_simuladas <- simulaciones_normales %>%
+  group_by(DENOMINACION) %>%
+  summarise(
+    PESO_MEDIO = mean(PESO_SIMULADO),
+    VALOR_TOTAL = as.numeric(DENOMINACION)  # Supongamos que el valor es igual a la denominación
+  )
+
+# Agregar las monedas simuladas a la base de datos relevante
+monedas_simuladas <- monedas_simuladas %>%
+  arrange(desc(VALOR_TOTAL / PESO_MEDIO))  # Ordenar por valor/ peso
+
+```
+
+# Explicación del Problema de la Mochila con Programación Dinámica
+
+
+El **Problema de la Mochila** busca seleccionar un subconjunto de monedas para maximizar el valor total sin exceder una capacidad máxima en términos de peso. En este caso, la capacidad está limitada a 1000 gramos.
+
+### Función Objetivo
+
+Maximizar el valor total de las monedas seleccionadas:
+
+$$
+\max(a_0 \cdot 50 + a_1 \cdot 100 + a_2 \cdot 200 + a_3 \cdot 500 + a_4 \cdot 1000)
+$$
+
+donde:
+
+- $a_0, a_1, a_2, a_3, a_4$ son las cantidades de monedas seleccionadas para las denominaciones de 50, 100, 200, 500 y 1000, respectivamente.
+- Los coeficientes representan los valores nominales de cada moneda.
+
+### Restricción de Capacidad
+
+La restricción de peso se ajusta según los pesos simulados de las monedas:
+
+$$
+w_0 a_0 + w_1 a_1 + w_2 a_2 + w_3 a_3 + w_4 a_4 \leq 1000 \text{ gramos}
+$$
+
+donde $w_0, w_1, w_2, w_3, w_4$ representan los pesos simulados de las monedas para cada denominación. Estos pesos pueden variar debido a las simulaciones y no son valores fijos.
+
+### Programación Dinámica
+
+La **programación dinámica** es una técnica para resolver problemas de optimización descomponiéndolos en subproblemas más manejables y combinando sus soluciones de manera óptima. La solución se estructura en una tabla de decisiones para evaluar la inclusión o exclusión de monedas basándose en sus valores y pesos.
+
+#### Pasos
+
+1. Definir una tabla $DP[i][j]$, donde:
+   - $i$ es el número de monedas o denominaciones consideradas.
+   - $j$ es el peso máximo permitido (en gramos) en cada iteración.
+2. Inicializar la tabla con ceros, ya que sin seleccionar monedas o con peso cero, el valor total es cero.
+3. Iterar sobre cada moneda, evaluando si incluirla en la mochila o no.
+4. Actualizar la tabla $DP[i][j]$ para maximizar el valor obtenido al incluir o no la moneda en la solución.
+
+#### Fórmula de Recurrencia
+
+La fórmula de recurrencia es:
+
+$$
+DP[i][j] = \max(DP[i-1][j], DP[i-1][j - w_i] + v_i)
+$$
+
+donde:
+
+- $DP[i-1][j]$ es el valor sin incluir la moneda actual.
+- $DP[i-1][j - w_i] + v_i$ es el valor al incluir la moneda actual, siempre y cuando el peso lo permita.
+- $w_i$ es el peso de la moneda $i$ y $v_i$ es su valor.
+
+El valor óptimo se encuentra en $DP[n][W]$, donde $n$ es el número total de monedas y $W$ es la capacidad máxima de la mochila (1000 gramos en este caso).
+
+```{r}
+# Función para resolver el problema de la mochila usando programación dinámica
+resolver_mochila <- function(monedas, peso_maximo) {
+  # Convertir las monedas en vectores de valor y peso
+  valores <- monedas$VALOR_TOTAL
+  pesos <- monedas$PESO_MEDIO
+  
+  # Crear la matriz de DP
+  num_monedas <- length(valores)
+  dp <- matrix(0, nrow = num_monedas + 1, ncol = peso_maximo + 1)
+  
+  # Rellenar la matriz DP
+  for (i in 1:num_monedas) {
+    for (w in 0:peso_maximo) {
+      if (pesos[i] <= w) {
+        dp[i + 1, w + 1] <- max(dp[i, w + 1], dp[i, w + 1 - pesos[i]] + valores[i])
+      } else {
+        dp[i + 1, w + 1] <- dp[i, w + 1]
+      }
+    }
+  }
+  
+  # Recuperar la combinación óptima
+  max_valor <- dp[num_monedas + 1, peso_maximo + 1]
+  w <- peso_maximo
+  seleccion <- rep(0, num_monedas)
+  
+  for (i in num_monedas:1) {
+    if (dp[i + 1, w + 1] != dp[i, w + 1]) {
+      seleccion[i] <- 1
+      w <- w - pesos[i]
+    }
+  }
+  
+  # Devolver los resultados
+  list(
+    valor_total = max_valor,
+    seleccion_monedas = monedas[seleccion == 1, ]
+  )
+}
+
+# Definir el peso máximo
+peso_maximo <- 1000
+
+# Resolver el problema de la mochila
+resultado_mochila <- resolver_mochila(monedas_simuladas, peso_maximo)
+
+# Mostrar los resultados
+print(paste("Valor total máximo:", resultado_mochila$valor_total))
+print("Combinación óptima de monedas:")
+print(resultado_mochila$seleccion_monedas)
+
+```
+
+## Teoría de Programación Dinámica
+
+La **programación dinámica** es una técnica utilizada para resolver problemas de optimización que pueden descomponerse en subproblemas más pequeños. Es particularmente útil para problemas que presentan una estructura de subproblemas solapados y que pueden ser resueltos eficientemente mediante la solución de estos subproblemas en un orden específico.
+
+### Características de la Programación Dinámica
+
+Para aplicar programación dinámica, un problema debe cumplir dos propiedades principales:
+
+- **Subestructura Óptima:** La solución óptima de un problema puede ser construida a partir de soluciones óptimas de sus subproblemas.
+- **Subproblemas Solapados:** Los subproblemas se repiten y sus soluciones se reutilizan varias veces.
+
+En el contexto del problema de la mochila, esto implica que la solución para una capacidad específica de la mochila puede ser construida utilizando soluciones para capacidades menores y monedas consideradas previamente.
+
+## Documentación para Programación Dinámica
+
+El problema de la mochila con programación dinámica se puede formular como sigue:
+
+### Definición del Problema
+
+Dado un conjunto de monedas con diferentes denominaciones y pesos, se busca maximizar el valor total de las monedas seleccionadas sin exceder una capacidad máxima en términos de peso.
+
+### Variables y Parámetros
+
+- $a_0, a_1, a_2, a_3, a_4$ representan las cantidades de monedas seleccionadas para cada denominación.
+- $w_i$ es el peso de la moneda $i$ según las simulaciones.
+- $v_i$ es el valor nominal de la moneda $i$.
+
+### Tabla de Decisiones
+
+Se define una tabla $DP[i][j]$ donde:
+
+- $i$ es el índice de la moneda considerada.
+- $j$ es la capacidad máxima de peso (en gramos) disponible.
+
+La tabla se llena siguiendo la fórmula de recurrencia y se actualiza para considerar la inclusión o exclusión de cada moneda.
+
+### Fórmula de Recurrencia
+
+La fórmula para actualizar la tabla de decisiones es:
+
+$$
+DP[i][j] = \max(DP[i-1][j], DP[i-1][j - w_i] + v_i)
+$$
+
+donde:
+
+- $DP[i-1][j]$ representa el valor total sin incluir la moneda actual.
+- $DP[i-1][j - w_i] + v_i$ representa el valor total al incluir la moneda actual, siempre que el peso lo permita.
+
+El valor óptimo se encuentra en $DP[n][W]$, donde $n$ es el número total de monedas y $W$ es la capacidad máxima de la mochila.
+
+## Resultado Óptimo
+
+Después de aplicar la programación dinámica al problema, se obtiene la combinación óptima de monedas que maximiza el valor total sin exceder la capacidad de peso permitida.
+
+### Resumen de la Combinación Óptima
+
+Para determinar la combinación de monedas óptima, se puede obtener un resumen que muestra las cantidades de cada tipo de moneda seleccionada, el peso medio y el valor total asociado. La combinación óptima se presenta de la siguiente manera:
+
+### Resumen de la Combinación Óptima
+
+Para determinar la combinación de monedas óptima, se puede obtener un resumen que muestra las cantidades de cada tipo de moneda seleccionada, el peso medio y el valor total asociado. La combinación óptima se presenta de la siguiente manera:
+
+
+$$
+\text{Resumen de la combinación óptima:}
+$$
+
+$$
+\begin{align*}
+\text{Combinación} &= (a_0, a_1, a_2, a_3, a_4) \\
+\text{Donde} & \\
+a_0 &= \text{Cantidad de monedas de 50} \\
+a_1 &= \text{Cantidad de monedas de 100} \\
+a_2 &= \text{Cantidad de monedas de 200} \\
+a_3 &= \text{Cantidad de monedas de 500} \\
+a_4 &= \text{Cantidad de monedas de 1000}
+\end{align*}
+$$
+```{r}
+# Mostrar resumen de la combinación óptima
+resumen_combinacion <- resultado_mochila$seleccion_monedas %>%
+  group_by(DENOMINACION) %>%
+  summarise(
+    PESO_MEDIO = mean(PESO_MEDIO),
+    VALOR_TOTAL = sum(VALOR_TOTAL),
+    TOTAL_MONEDAS = n(),
+  )
+
+print(resumen_combinacion)
+
+```
+
+Encontramos $\left(a_0, a_1, a_2, a_3, x_4\right)$ tal que:
+
+$$
+a_{0}50 +a_1 100+a_2 200+a_3 500+a_4 1000
+$$
+
+Tenga su maximo cuando 
+$$
+max = 1*100 + 83*1000
+$$
+
+
+
+Obtiene su maximo del modelo anterior sabiendo que su maximo se obtiene cuando la suma de los pesos de las monedas sea $\leqslant 1 \mathrm{~kg}$.
+
+
+```{r}
+totales <- c(sum(resumen_combinacion$VALOR_TOTAL), sum(resumen_combinacion$PESO_MEDIO))
+```
+
+
+
